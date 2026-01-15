@@ -11,80 +11,46 @@ Commercial use is prohibited without prior written permission.
 See the LICENSE file in the project root for full license terms.
 """
 
-# ============================================================
-#keeps only rows where Duration == 20
-# merges consecutive 20 ms rows when they belong to the same AOI and are continuous in time 
-# writes out:
-## the merged segments (“runs”)
-## summary tables per AOI
-## GROUP_COLS defines the “context” that must match before rows can be merged 
-## (same Recording, Participant, Interval, Event type, etc.). 
-## Rows from different groups are never merged together.
-# ============================================================
-
-# ============================================================
-# PATH CONFIG (relative folders)
-## It reads from: ./input_metrics_data/hockey_vlad_metrics_workaround.xlsx
-## It writes to: ./output_data/Hockey_workaround_aggregated.xlsx
-## It reads the sheet: TPL_rawFilter_metrics
-## It only processes rows with Duration == 20
-# ============================================================
 BASE_DIR = Path(__file__).resolve().parent
 
-INPUT_FOLDER = BASE_DIR / "input_metrics_data"       # <-- changed
-OUTPUT_FOLDER = BASE_DIR / "output_data"             # <-- changed
+INPUT_FOLDER = BASE_DIR / "input_metrics_data"
+OUTPUT_FOLDER = BASE_DIR / "output_data"
 
 INPUT_XLSX = INPUT_FOLDER / "hockey_vlad_metrics_workaround.xlsx"
-OUTPUT_XLSX = OUTPUT_FOLDER / "Hockey_workaround_aggregated.xlsx"
+OUTPUT_XLSX = OUTPUT_FOLDER / "hockey_workaround_aggregated.xlsx"
 
 SHEET_NAME = "TPL_rawFilter_metrics"
 DURATION_TARGET = 20
-
-# Two rows can only be merged if they have the same:
-## Recording (same data file / trial)
-## Participant
-## Position (goalie/player position etc.)
-## TOI
-## Interval
-## Event_type
-## Validity
-# Then (within that same group), the script checks:
-## are they consecutive in time (Start/Stop)?
-## do they have the same AOI?
 
 GROUP_COLS = [
     "Recording", "Participant", "Position", "TOI", "Interval", "Event_type", "Validity"
 ]
 
 
-def merge_consecutive_aoi(df: pd.DataFrame) -> pd.DataFrame:
+def merge_consecutive_aoi(df: pd.DataFrame):
     # Convert time columns to numeric
     for c in ["Start", "Stop", "Duration"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    # Keep only rows with Duration == 20 (as requested)
-    # Everything else (Duration ≠ 20) is excluded and later written to a separate sheet.
+    # Split into 20ms bins and non-20 rows
     df20 = df[df["Duration"] == DURATION_TARGET].copy()
+    df_non20 = df[df["Duration"] != DURATION_TARGET].copy()
 
-    # Sort for run detection
+    # Sort for run detection (only for the 20ms stream)
     df20 = df20.sort_values(GROUP_COLS + ["Start", "Stop"]).reset_index(drop=True)
 
     def compute_new_run(g: pd.DataFrame) -> pd.Series:
         same_aoi = g["AOI"].eq(g["AOI"].shift(1))
 
-        # “Start (difference) values as 20 / 20-step continuitys” requirement:
-        # either next Start == previous Stop OR Start increased by exactly 20
+        # continuity: Start == previous Stop OR Start step == 20
         contiguous_by_stop = g["Start"].eq(g["Stop"].shift(1))
         contiguous_by_step = (g["Start"] - g["Start"].shift(1)).eq(DURATION_TARGET)
 
         contiguous = contiguous_by_stop | contiguous_by_step
 
-        # Start a new run if AOI changes or the 20-step continuity breaks
-        new_run = ~(same_aoi & contiguous)
-        return new_run
-    
-    # Rebuild the df20 index to be 0,1,2,3,… 
-    # and throws away the old index.
+        # new run when AOI changes or continuity breaks
+        return ~(same_aoi & contiguous)
+
     df20["new_run"] = (
         df20.groupby(GROUP_COLS, group_keys=False)
         .apply(compute_new_run)
@@ -92,10 +58,9 @@ def merge_consecutive_aoi(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     df20["run_id"] = df20.groupby(GROUP_COLS)["new_run"].cumsum()
-
     df20["SegmentsMerged"] = 1
 
-    agg = (
+    merged_runs = (
         df20.groupby(GROUP_COLS + ["run_id"], as_index=False)
         .agg(
             EventIndex=("EventIndex", "first"),
@@ -104,33 +69,45 @@ def merge_consecutive_aoi(df: pd.DataFrame) -> pd.DataFrame:
             Duration=("Duration", "sum"),
             AOI=("AOI", "first"),
             SegmentsMerged=("SegmentsMerged", "sum"),
-            Fixation_order_nr=("Fixation order nr", "first"),
-            Tot_dur_fix_SpaceIce=("Tot dur fix SpaceIce", "first"),
-            Tot_dur_fix_Puck=("Tot dur fix Puck", "first"),
         )
-    )
+    ).sort_values(GROUP_COLS + ["Start", "Stop"]).reset_index(drop=True)
 
-    # Nice ordering
-    agg = agg.sort_values(["Interval", "Start"]).reset_index(drop=True)
-    return agg, df20, df[df["Duration"] != DURATION_TARGET].copy()
+    return merged_runs, df20, df_non20
 
 
 def main():
-    # Ensure folders exist
     if not INPUT_FOLDER.exists():
         raise FileNotFoundError(
-            f"Input folder not found: {INPUT_FOLDER}\n"
-            f"Expected file at: {INPUT_XLSX}"
+            f"Input folder not found: {INPUT_FOLDER}\nExpected file at: {INPUT_XLSX}"
         )
 
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
-    # Read Excel
     df = pd.read_excel(INPUT_XLSX, sheet_name=SHEET_NAME)
 
-    merged_runs, df20_rows, excluded = merge_consecutive_aoi(df)
+    merged_runs, df20_rows, non20_rows = merge_consecutive_aoi(df)
 
-    # AOI summaries
+    # ---- NEW: combine merged 20ms runs + raw non-20 rows into ONE sheet ----
+    merged_runs_out = merged_runs.copy()
+    merged_runs_out["Source"] = "Merged20msRun"
+
+    non20_out = non20_rows.copy()
+    non20_out["Source"] = "RawNon20Row"
+    # (Optional) keep original Excel row index for easier debugging:
+    non20_out["OriginalRowIndex"] = non20_out.index
+
+    # Make schemas compatible (union of columns)
+    all_cols = list(dict.fromkeys(list(merged_runs_out.columns) + list(non20_out.columns)))
+    merged_runs_out = merged_runs_out.reindex(columns=all_cols)
+    non20_out = non20_out.reindex(columns=all_cols)
+
+    combined = (
+        pd.concat([merged_runs_out, non20_out], ignore_index=True)
+        .sort_values(GROUP_COLS + ["Start", "Stop"], kind="mergesort")
+        .reset_index(drop=True)
+    )
+
+    # AOI summaries (based on original 20ms rows)
     aoi_summary_overall = (
         df20_rows.groupby("AOI", as_index=False)
         .agg(
@@ -152,13 +129,14 @@ def main():
         )
     )
 
-    # Write output
     with pd.ExcelWriter(OUTPUT_XLSX, engine="openpyxl") as writer:
+        # ✅ One sheet with both 20ms merged runs and non-20 rows
+        combined.to_excel(writer, sheet_name="Timeline_Combined", index=False)
+
+        # Keep these (optional)
         merged_runs.to_excel(writer, sheet_name="MergedRuns", index=False)
         aoi_summary_overall.to_excel(writer, sheet_name="AOI_Summary", index=False)
         aoi_by_group.to_excel(writer, sheet_name="AOI_ByGroup", index=False)
-        if not excluded.empty:
-            excluded.to_excel(writer, sheet_name="Excluded_Not20ms", index=False)
 
     print(f"✅ Read from:  {INPUT_XLSX}")
     print(f"✅ Wrote to:   {OUTPUT_XLSX}")
