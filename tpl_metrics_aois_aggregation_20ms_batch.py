@@ -19,6 +19,7 @@ OUTPUT_FOLDER = BASE_DIR / "output_data"
 SHEET_NAME = "TPL_rawFilter_metrics"
 DURATION_TARGET = 20
 
+# Aggregation happens only when all of those match. 
 GROUP_COLS = [
     "Recording", "Participant", "Position", "TOI", "Interval", "Event_type", "Validity"
 ]
