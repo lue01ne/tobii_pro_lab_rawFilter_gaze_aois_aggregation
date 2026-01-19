@@ -8,6 +8,8 @@ python -m venv venv
 venv\Scripts\activate
 
 Install dependencies:
+
+### pandas & openpyxl
 pip install pandas openpyxl
 
 ## Script execution

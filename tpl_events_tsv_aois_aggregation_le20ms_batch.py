@@ -13,6 +13,7 @@ See the LICENSE file in the project root for full license terms.
 
 # ============================================================
 # PATH CONFIG (relative folders)
+# This script has been tested in a Python 3.14.2 environment.
 # ============================================================
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -22,7 +23,7 @@ OUTPUT_FOLDER = BASE_DIR / "output_data"
 SHEET_NAME = "TPL_rawFilter_metrics"
 DURATION_TARGET = 20  # merge rows with Duration <= 20
 
-# Group context: rows must match these columns to be considered for the same run stream
+# Group context: rows must match these columns to be considered for the same run stream to aggregate.
 GROUP_COLS = [
     "Recording",
     "Participant",
@@ -87,6 +88,7 @@ def merge_consecutive_aoi_duration_le20(df: pd.DataFrame):
     le20_rows["SegmentsMerged"] = 1
 
     # -------- Aggregate runs --------
+    # Aggregation rules - how each column should be aggregated.
     agg_dict = {
         "Start": ("Start", "min"),
         "Stop": ("Stop", "max"),
