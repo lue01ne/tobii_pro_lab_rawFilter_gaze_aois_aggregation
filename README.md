@@ -1,5 +1,3 @@
-# My Project Name
-
 This scripts is intended for ...
 
 ## License
