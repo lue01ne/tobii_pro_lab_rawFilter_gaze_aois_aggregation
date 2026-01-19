@@ -2,7 +2,7 @@ This script aggregates consecutive raw gaze samples that were manually mapped to
 
 ## Installation
 
-[Recommended] Create and activate a Python virtual environment 
+[Recommendation] Create and activate a Python virtual environment 
 
 python -m venv venv
 venv\Scripts\activate
@@ -10,8 +10,14 @@ venv\Scripts\activate
 Install dependencies:
 pip install pandas openpyxl
 
-## Script Execution
-Bla bla bla...
+## Script execution
+
+### Input
+- Place all input files in './input_metrics_data'.
+- THe input Excel workbook ('.xlsx') must contain a worksheet named 'TPL_rawFilter_metrics", which includes the raw gaze metrics exported from Tobii Pro Lab https://www.tobii.com/products/software/behavior-research-software/tobii-pro-lab
+
+### Output
+- All aggregated output files will be written to './output_data/'.
 
 ## License
 
