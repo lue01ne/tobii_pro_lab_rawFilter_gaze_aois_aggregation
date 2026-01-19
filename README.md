@@ -10,6 +10,8 @@ venv\Scripts\activate
 Install dependencies:
 pip install pandas openpyxl
 
+## Script Execution
+Bla bla bla...
 
 ## License
 
