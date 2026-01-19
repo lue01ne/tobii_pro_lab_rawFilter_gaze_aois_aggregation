@@ -30,7 +30,7 @@ For each recording / participant / interval context, the script:
   ```
 - Each `.xlsx` file is expected to contain a sheet named:
   ```
-  TPL_rawFilter_metrics
+  TPL_raw
   ```
 
 ### Output

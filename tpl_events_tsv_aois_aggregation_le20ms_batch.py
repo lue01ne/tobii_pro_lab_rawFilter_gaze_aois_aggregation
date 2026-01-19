@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent
 INPUT_FOLDER = BASE_DIR / "input_metrics_data"
 OUTPUT_FOLDER = BASE_DIR / "output_data"
 
-SHEET_NAME = "TPL_rawFilter_metrics"
+SHEET_NAME = "TPL_raw"
 DURATION_TARGET = 20  # merge rows with Duration <= 20
 
 # Group context: rows must match these columns to be considered for the same run stream to aggregate.
@@ -188,7 +188,7 @@ def main():
     for input_xlsx in input_files:
         process_one_file(input_xlsx)
 
-    print("\n🎉 Done. All files processed.")
+    print("\n🦕 Done. All files processed.")
 
 
 if __name__ == "__main__":
