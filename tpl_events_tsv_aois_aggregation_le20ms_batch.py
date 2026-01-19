@@ -42,6 +42,7 @@ def merge_consecutive_aoi_duration_le20(df: pd.DataFrame):
       - Start == previous Stop  (works for any duration <= 20)
     Optional fallback continuity (only for 20ms-to-20ms rows):
       - Start - previous Start == 20
+      - When Stop values are not fully aligned exactly as expected, e.g. Stop becomes 19, 21, 39, 41, 59, ...
 
     Returns:
       merged_runs: aggregated runs built from rows with Duration <= 20
