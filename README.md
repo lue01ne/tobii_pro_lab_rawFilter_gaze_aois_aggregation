@@ -5,7 +5,6 @@ This script aggregates consecutive raw gaze samples that were manually mapped to
 [Recommended] Create and activate a Python virtual environment 
 
 python -m venv venv
-# Windows
 venv\Scripts\activate
 
 Install dependencies:
