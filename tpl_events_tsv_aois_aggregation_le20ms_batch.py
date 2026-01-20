@@ -84,7 +84,10 @@ def merge_consecutive_aoi_duration_le20(df: pd.DataFrame):
     # New run when AOI changes OR continuity breaks
     le20_rows["new_run"] = ~(same_aoi & contiguous)
 
-    # Run id within each GROUP_COLS group
+    # run_id increments whenever the AOI changes or time continuity breaks.
+    ## run_id is an automatically generated index for each continuous AOI segment (“run”) 
+    ## within the same GROUP_COLS context (same Recording/Participant/TOI/Interval/Event_type/Validity).
+    # It hence can be used as the event order within an interval.
     le20_rows["run_id"] = le20_rows.groupby(GROUP_COLS)["new_run"].cumsum()
     le20_rows["SegmentsMerged"] = 1
 
